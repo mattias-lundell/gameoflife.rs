@@ -1,55 +1,109 @@
-extern crate shader_version;
-extern crate input;
-extern crate event;
-extern crate image;
 extern crate graphics;
+extern crate piston;
 extern crate sdl2_window;
 extern crate opengl_graphics;
+extern crate shader_version;
+extern crate event;
+
+use sdl2_window::Sdl2Window as Window;
+use opengl_graphics::Gl;
+use shader_version::opengl::OpenGL::_3_2;
+use std::collections::HashSet;
 
 use std::cell::RefCell;
-use opengl_graphics::{ Gl,Texture };
-use sdl2_window::Sdl2Window;
-use image::GenericImage;
-use input::{ Button, MouseButton };
-use std::rand::distributions::{IndependentSample, Range};
-use std::rand;
+use piston::{
+    RenderArgs,
+    UpdateArgs
+};
 
-fn main() {
-    let opengl = shader_version::OpenGL::_3_2;
-    let (width, height) = (300, 300);
-    let window = Sdl2Window::new(
-        opengl,
-        event::WindowSettings {
-            title: "gameoflife.rs".to_string(),
-            size: [width, height],
-            fullscreen: false,
-            exit_on_esc: true,
-            samples: 0,
-        }
-    );
+use graphics::*;
 
-    let mut image = image::ImageBuffer::new(width, height);
-    let mut draw = false;
-    let mut texture = Texture::from_image(&image);
-    let ref mut gl = Gl::new(opengl);
-    let window = RefCell::new(window);
+use event::{
+    RenderEvent,
+    UpdateEvent,
+};
 
-    let mut rng = rand::thread_rng();
-    let xs = Range::new(0u32, width);
-    let ys = Range::new(0u32, height);
+pub static WINDOW_HEIGHT: i32 = 600;
+pub static WINDOW_WIDTH: i32 = 600;
+pub static BLOCKSIZE: f64 = 10.0;
 
-    for n in range(0u32, 1000) {
-        let x = xs.ind_sample(&mut rng);
-        let y = ys.ind_sample(&mut rng);
-        image.put_pixel(x, y, image::Rgba([0,0,0,255]));
-        texture.update(&image);
+pub static BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+pub static WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
+
+#[derive(PartialEq, Eq, Hash)]
+struct Cell { x: i32, y: i32 }
+impl Cell {
+    fn new(x: i32, y: i32) -> Cell {
+        Cell { x: x, y: y }
     }
 
-    for e in event::events(&window) {
-        gl.draw([0, 0, width as i32, height as i32], |c, gl| {
-            graphics::clear([1.0; 4], gl);
-            graphics::image(&texture, &c, gl);
-        });
+    pub fn render(&self,  ctx: &Context, gl: &mut Gl) {
+        let x0 = self.x as f64 * BLOCKSIZE;
+        let y0 = self.y as f64 * BLOCKSIZE;
+        Rectangle::new(BLACK).draw([x0, y0, BLOCKSIZE, BLOCKSIZE], ctx, gl);
+    }
+}
 
+struct World {
+    grid: HashSet<Cell>
+}
+
+impl World {
+    fn new() -> World {
+        let grid: HashSet<Cell> = HashSet::new();
+        World {grid: grid}
+    }
+    fn render(&mut self, ctx: &Context, gl: &mut Gl) -> () {
+        for cell in self.grid.iter() {
+            cell.render(ctx, gl)
+        }
+    }
+}
+
+pub struct App {
+    gl: Gl,
+    world: World
+}
+
+impl App {
+    fn render(&mut self, _: &mut Window, args: &RenderArgs) {
+        let w = args.width as f64;
+        let h = args.height as f64;
+
+        let ctx = Context::abs(w, h);
+        graphics::clear(WHITE, &mut self.gl);
+
+        let f = Cell::new(0, 0);
+        let g = Cell::new(1, 1);
+        let h = Cell::new(2, 2);
+        let i = Cell::new(3, 3);
+
+        self.world.grid.insert(f);
+        self.world.grid.insert(g);
+        self.world.grid.insert(h);
+        self.world.grid.insert(i);
+
+        self.world.render(&ctx, &mut self.gl);
+    }
+
+    fn update(&mut self, _: &mut Window, args: &UpdateArgs) {
+    }
+}
+
+fn main() {
+    let window = Window::new(
+        _3_2,
+        piston::WindowSettings::default());
+
+    let mut app = App { gl: Gl::new(_3_2), world: World::new() };
+
+    let window = RefCell::new(window);
+    for e in event::events(&window) {
+        if let Some(r) = e.render_args() {
+            app.render(&mut *window.borrow_mut(), &r);
+        }
+        if let Some(u) = e.update_args() {
+            app.update(&mut *window.borrow_mut(), &u);
+        }
     }
 }

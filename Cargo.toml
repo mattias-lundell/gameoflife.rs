@@ -29,3 +29,6 @@ git = "https://github.com/pistondevelopers/input"
 
 [dependencies.image]
 git = "https://github.com/pistondevelopers/image"
+
+[dependencies.piston]
+git = "https://github.com/PistonDevelopers/piston.git"
