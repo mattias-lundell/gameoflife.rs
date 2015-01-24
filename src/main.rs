@@ -30,10 +30,10 @@ pub static BLOCKSIZE: f64 = 10.0;
 pub static BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 pub static WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
 
-#[derive(PartialEq, Eq, Hash)]
-struct Cell { x: i32, y: i32 }
+#[derive(PartialEq, Eq, Hash, Clone, Show)]
+pub struct Cell { x: i32, y: i32 }
 impl Cell {
-    fn new(x: i32, y: i32) -> Cell {
+    pub fn new(x: i32, y: i32) -> Cell {
         Cell { x: x, y: y }
     }
 
@@ -44,20 +44,73 @@ impl Cell {
     }
 }
 
-struct World {
-    grid: HashSet<Cell>
-}
+type Grid = HashSet<Cell>;
 
+pub struct World {
+    grid: Grid
+}
 impl World {
-    fn new() -> World {
-        let grid: HashSet<Cell> = HashSet::new();
+    pub fn new() -> World {
+        let mut grid: Grid = HashSet::new();
         World {grid: grid}
     }
-    fn render(&mut self, ctx: &Context, gl: &mut Gl) -> () {
+
+    pub fn render(&mut self, ctx: &Context, gl: &mut Gl) -> () {
         for cell in self.grid.iter() {
             cell.render(ctx, gl)
         }
     }
+
+    fn step(&mut self) -> () {
+        let mut grid: Grid = HashSet::new();
+        let neighbors =  self.neighbors(&self.grid);
+        for cell in neighbors.iter() {
+            // alive
+            if self.grid.contains(cell) {
+                let n_alive: i32 = self.count_neighbors(&self.grid, cell);
+                if n_alive == 2 || n_alive == 3 {
+                    grid.insert(cell.clone());
+                }
+            }
+            // dead
+            else {
+                let n_alive: i32 = self.count_neighbors(&self.grid, cell);
+                if n_alive == 3 {
+                    grid.insert(cell.clone());
+                }
+            }
+
+        }
+        self.grid = grid;
+    }
+
+
+    fn neighbors(&self, grid: &Grid) -> Grid {
+        let mut neighbors: Grid = HashSet::new();
+        for cell in self.grid.iter() {
+            for &i in [-1, 0, 1].iter() {
+                for &j in [-1, 0, 1].iter() {
+                    neighbors.insert(Cell::new(cell.x + i, cell.y + j));
+                }
+            }
+        }
+        neighbors
+    }
+
+    fn count_neighbors(&self, grid: &Grid, cell: &Cell) -> i32 {
+        let mut n = 0;
+        for &i in [-1, 0, 1].iter() {
+            for &j in [-1, 0, 1].iter() {
+                if i != 0 && j != 0 {
+                    if grid.contains(&Cell::new(cell.x + i, cell.y + j)) {
+                        n += 1;
+                    }
+                }
+            }
+        }
+        n
+    }
+
 }
 
 pub struct App {
@@ -82,7 +135,7 @@ impl App {
         self.world.grid.insert(g);
         self.world.grid.insert(h);
         self.world.grid.insert(i);
-
+        self.world.step();
         self.world.render(&ctx, &mut self.gl);
     }
 
