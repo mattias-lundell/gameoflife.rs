@@ -5,16 +5,17 @@ extern crate opengl_graphics;
 extern crate shader_version;
 extern crate event;
 extern crate quack;
-
+use std::str::FromStr;
+use std::io::BufferedReader;
+use std::io::File;
 use sdl2_window::Sdl2Window as Window;
 use opengl_graphics::Gl;
 use shader_version::opengl::OpenGL::_3_2;
 use std::collections::HashSet;
-
+use std::os;
 use std::cell::RefCell;
 use piston::{
     RenderArgs,
-    UpdateArgs,
 };
 
 use graphics::*;
@@ -22,9 +23,6 @@ use graphics::*;
 use event::{
     RenderEvent,
     UpdateEvent,
-    WindowSettings,
-    Events,
-    Event,
     Ups,
     MaxFps,
 };
@@ -52,23 +50,13 @@ impl Cell {
     }
 }
 
-type Grid = HashSet<Cell>;
+pub type Grid = HashSet<Cell>;
 
 pub struct World {
     grid: Grid
 }
 impl World {
-    pub fn new() -> World {
-        let mut grid: Grid = HashSet::new();
-
-        let g = Cell::new(2, 1);
-        let h = Cell::new(2, 2);
-        let i = Cell::new(2, 3);
-
-        grid.insert(g);
-        grid.insert(h);
-        grid.insert(i);
-
+    pub fn new(grid: Grid) -> World {
         World {grid: grid}
     }
 
@@ -135,8 +123,8 @@ pub struct App {
     world: World
 }
 impl App {
-    fn new() -> App {
-        App { gl: Gl::new(_3_2), world: World::new() }
+    fn new(grid: Grid) -> App {
+        App { gl: Gl::new(_3_2), world: World::new(grid) }
     }
 
     fn render(&mut self, _: &mut Window, args: &RenderArgs) {
@@ -154,16 +142,55 @@ impl App {
     }
 }
 
+fn read_life_file(path: String) -> Grid {
+    let mut min_x: i32 = std::i32::MAX;
+    let mut min_y: i32 = std::i32::MAX;
+
+    let mut xs: Vec<i32> = Vec::new();
+    let mut ys: Vec<i32> = Vec::new();
+
+    let filepath = Path::new(path);
+    let mut file = BufferedReader::new(File::open(&filepath));
+    let mut lines = file.lines();
+    lines.next();
+
+    for line in lines {
+        match line {
+            Ok(l) => {
+                let row: Vec<i32> = l.trim().split(' ').filter_map(FromStr::from_str).collect::<Vec<i32>>();
+                xs.push(row[0]);
+                ys.push(row[1]);
+
+                min_x = std::cmp::min(row[0], min_x);
+                min_y = std::cmp::min(row[1], min_y);
+            }
+            Err(error) => print!("{}", error.desc)
+        }
+    }
+
+    let x_offset: i32 = -1 * min_x;
+    let y_offset: i32 = -1 * min_y;
+    let mut grid: Grid = HashSet::new();
+
+    for (&x, &y) in xs.iter().zip(ys.iter()) {
+        grid.insert(Cell::new(x + x_offset, y + y_offset));
+    }
+
+    grid
+}
+
 fn main() {
+    let infile: String = os::args()[1].clone();
+    let grid: Grid = read_life_file(infile);
     let window = Window::new(
         _3_2,
         piston::WindowSettings::default());
 
-    let mut app = App::new();
+    let mut app = App::new(grid);
 
     let window = RefCell::new(window);
 
-    for e in event::events(&window).set(Ups(2)).set(MaxFps(60)) {
+    for e in event::events(&window).set(Ups(10)).set(MaxFps(60)) {
         e.render(|args| {
             app.render(&mut *window.borrow_mut(), args);
         });
