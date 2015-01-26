@@ -14,3 +14,5 @@ Example:
 ```
 cargo run resources/gosperglidergun_106.lif
 ```
+
+![gosperglidergun](gosperglidergun.gif)
