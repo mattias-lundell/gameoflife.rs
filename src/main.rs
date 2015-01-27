@@ -130,10 +130,8 @@ impl App {
     fn render(&mut self, _: &mut Window, args: &RenderArgs) {
         let w = args.width as f64;
         let h = args.height as f64;
-
-        let ctx = Context::abs(w, h);
+        let ctx = Context::abs(w, h).trans(w/2.0, h/2.0);
         graphics::clear(WHITE, &mut self.gl);
-
         self.world.render(&ctx, &mut self.gl);
     }
 
@@ -143,11 +141,7 @@ impl App {
 }
 
 fn read_life_file(path: String) -> Grid {
-    let mut min_x: i32 = std::i32::MAX;
-    let mut min_y: i32 = std::i32::MAX;
-
-    let mut xs: Vec<i32> = Vec::new();
-    let mut ys: Vec<i32> = Vec::new();
+    let mut grid: Grid = HashSet::new();
 
     let filepath = Path::new(path);
     let mut file = BufferedReader::new(File::open(&filepath));
@@ -158,30 +152,20 @@ fn read_life_file(path: String) -> Grid {
         match line {
             Ok(l) => {
                 let row: Vec<i32> = l.trim().split(' ').filter_map(FromStr::from_str).collect::<Vec<i32>>();
-                xs.push(row[0]);
-                ys.push(row[1]);
-
-                min_x = std::cmp::min(row[0], min_x);
-                min_y = std::cmp::min(row[1], min_y);
+                let x = row[0];
+                let y = row[1];
+                grid.insert(Cell::new(x, y));
             }
             Err(error) => print!("{}", error.desc)
         }
     }
-
-    let x_offset: i32 = -1 * min_x;
-    let y_offset: i32 = -1 * min_y;
-    let mut grid: Grid = HashSet::new();
-
-    for (&x, &y) in xs.iter().zip(ys.iter()) {
-        grid.insert(Cell::new(x + x_offset, y + y_offset));
-    }
-
     grid
 }
 
 fn main() {
     let infile: String = os::args()[1].clone();
     let grid: Grid = read_life_file(infile);
+
     let window = Window::new(
         _3_2,
         piston::WindowSettings::default());
